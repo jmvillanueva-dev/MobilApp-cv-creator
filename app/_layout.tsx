@@ -1,24 +1,53 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { Stack } from "expo-router";
+import { CVProvider } from "../context/CVContext";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+    <CVProvider>
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: "#3498db",
+          },
+          headerTintColor: "#fff",
+          headerTitleStyle: {
+            fontWeight: "bold",
+          },
+        }}
+      >
+        <Stack.Screen
+          name="index"
+          options={{
+            title: "Crear CV",
+            headerShown: true,
+          }}
+        />
+        <Stack.Screen
+          name="personal-info"
+          options={{
+            title: "Información Personal",
+          }}
+        />
+        <Stack.Screen
+          name="experience"
+          options={{
+            title: "Experiencia Laboral",
+          }}
+        />
+        <Stack.Screen
+          name="education"
+          options={{
+            title: "Educación",
+          }}
+        />
+        <Stack.Screen
+          name="preview"
+          options={{
+            title: "Vista Previa",
+            presentation: "modal",
+          }}
+        />
       </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    </CVProvider>
   );
 }
