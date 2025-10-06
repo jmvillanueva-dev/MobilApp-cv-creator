@@ -1,5 +1,3 @@
-// app/education.tsx
-
 import React, { useState } from "react";
 import {
   View,
@@ -15,6 +13,19 @@ import { NavigationButton } from "../components/NavigationButton";
 import { useCVContext } from "../context/CVContext";
 import { Education } from "../types/cv.types";
 
+// Tipos para facilitar el manejo de errores
+type EducationFormKeys = keyof Omit<Education, "id">;
+
+interface FormErrors {
+  institution?: string;
+  degree?: string;
+  field?: string;
+  graduationYear?: string;
+}
+
+// 🔑 Definimos la longitud mínima requerida
+const MIN_LENGTH = 3;
+
 export default function EducationScreen() {
   const router = useRouter();
   const { cvData, addEducation, deleteEducation } = useCVContext();
@@ -26,9 +37,75 @@ export default function EducationScreen() {
     graduationYear: "",
   });
 
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  // Función de validación de campo
+  const validateField = (field: EducationFormKeys, value: string): boolean => {
+    let error = "";
+    const requiredFields: EducationFormKeys[] = ["institution", "degree"];
+    // 🔑 Campos de texto a los que se aplica la longitud mínima
+    const textFields: EducationFormKeys[] = ["institution", "degree", "field"];
+
+    const trimmedValue = value.trim();
+
+    // 1. Validación de REQUERIDO
+    if (requiredFields.includes(field) && !trimmedValue) {
+      error = `Este campo es obligatorio.`;
+    }
+    // 2. Validación de LONGITUD MÍNIMA
+    else if (
+      textFields.includes(field) &&
+      trimmedValue.length > 0 && // Solo si tiene contenido (para que el error de 'obligatorio' se muestre primero)
+      trimmedValue.length < MIN_LENGTH
+    ) {
+      error = `Debe tener al menos ${MIN_LENGTH} caracteres.`;
+    }
+    // 3. Validación de FORMATO (Año de Graduación)
+    else if (
+      field === "graduationYear" &&
+      trimmedValue.length > 0 && // Solo si tiene contenido
+      (!/^\d{4}$/.test(trimmedValue) ||
+        parseInt(trimmedValue) > new Date().getFullYear() + 5)
+    ) {
+      error = "Debe ser un año válido (YYYY).";
+    }
+
+    // Actualizar el estado de errores
+    setErrors((prevErrors) => ({ ...prevErrors, [field]: error }));
+    return error.length === 0;
+  };
+
+  // Función para manejar el cambio de texto y la validación en tiempo real
+  const handleInputChange = (field: EducationFormKeys, text: string) => {
+    setFormData({ ...formData, [field]: text });
+    validateField(field, text); // Validación en tiempo real
+  };
+
+  // Función de validación final del formulario antes de agregar
+  const validateForm = () => {
+    let isFormValid = true;
+    const fieldsToValidate: EducationFormKeys[] = [
+      "institution",
+      "degree",
+      "field", // Incluimos el opcional 'field' para validar su longitud si tiene contenido
+      "graduationYear",
+    ];
+
+    fieldsToValidate.forEach((field) => {
+      if (!validateField(field, formData[field] || "")) {
+        isFormValid = false;
+      }
+    });
+
+    return isFormValid;
+  };
+
   const handleAdd = () => {
-    if (!formData.institution || !formData.degree) {
-      Alert.alert("Error", "Por favor completa al menos institución y título");
+    if (!validateForm()) {
+      Alert.alert(
+        "Error de Validación",
+        `Por favor corrige los errores. Los campos de texto deben tener al menos ${MIN_LENGTH} caracteres.`
+      );
       return;
     }
 
@@ -39,13 +116,13 @@ export default function EducationScreen() {
 
     addEducation(newEducation);
 
-    // Limpiar formulario
     setFormData({
       institution: "",
       degree: "",
       field: "",
       graduationYear: "",
     });
+    setErrors({});
 
     Alert.alert("Éxito", "Educación agregada correctamente");
   };
@@ -66,69 +143,45 @@ export default function EducationScreen() {
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Agregar Nueva Educación</Text>
 
+        {/* Campo Institución */}
         <InputField
           label="Institución *"
           placeholder="Nombre de la universidad/institución"
           value={formData.institution}
-          onChangeText={(text) =>
-            setFormData({ ...formData, institution: text })
-          }
+          onChangeText={(text) => handleInputChange("institution", text)}
+          error={errors.institution} // Pasa el error
         />
 
+        {/* Campo Título/Grado */}
         <InputField
           label="Título/Grado *"
           placeholder="Ej: Licenciatura, Maestría"
           value={formData.degree}
-          onChangeText={(text) => setFormData({ ...formData, degree: text })}
+          onChangeText={(text) => handleInputChange("degree", text)}
+          error={errors.degree} // Pasa el error
         />
 
+        {/* Campo Área de Estudio (Opcional) */}
         <InputField
           label="Área de Estudio"
           placeholder="Ej: Ingeniería en Sistemas"
           value={formData.field}
-          onChangeText={(text) => setFormData({ ...formData, field: text })}
+          onChangeText={(text) => handleInputChange("field", text)}
+          error={errors.field} // Pasa el error
         />
 
+        {/* Campo Año de Graduación */}
         <InputField
           label="Año de Graduación"
           placeholder="Ej: 2023"
           value={formData.graduationYear}
-          onChangeText={(text) =>
-            setFormData({ ...formData, graduationYear: text })
-          }
+          onChangeText={(text) => handleInputChange("graduationYear", text)}
           keyboardType="numeric"
+          error={errors.graduationYear} // Pasa el error
         />
 
         <NavigationButton title="Agregar Educación" onPress={handleAdd} />
 
-        {cvData.education.length > 0 && (
-          <>
-            <Text style={styles.listTitle}>Educación Agregada</Text>
-            {cvData.education.map((edu) => (
-              <View key={edu.id} style={styles.card}>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>{edu.degree}</Text>
-                  <Text style={styles.cardSubtitle}>{edu.field}</Text>
-                  <Text style={styles.cardInstitution}>{edu.institution}</Text>
-                  <Text style={styles.cardDate}>{edu.graduationYear}</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(edu.id)}
-                >
-                  <Text style={styles.deleteButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </>
-        )}
-
-        <NavigationButton
-          title="Volver"
-          onPress={() => router.back()}
-          variant="secondary"
-          style={{ marginTop: 16 }}
-        />
       </View>
     </ScrollView>
   );

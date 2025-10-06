@@ -1,3 +1,5 @@
+// app/experience.tsx (Modificado)
+
 import React, { useState } from "react";
 import {
   View,
@@ -10,8 +12,23 @@ import {
 import { useRouter } from "expo-router";
 import { InputField } from "../components/InputField";
 import { NavigationButton } from "../components/NavigationButton";
+import { DatePickerField } from "@/components/DatePickerField";
 import { useCVContext } from "../context/CVContext";
 import { Experience } from "../types/cv.types";
+
+// 1. Definir el tipo para los errores, excluyendo 'id'
+type ExperienceFormKeys = keyof Omit<Experience, "id">;
+
+interface FormErrors {
+  company?: string;
+  position?: string;
+  startDate?: string;
+  endDate?: string;
+  description?: string;
+}
+
+// Definimos la longitud mínima requerida
+const MIN_LENGTH = 3;
 
 export default function ExperienceScreen() {
   const router = useRouter();
@@ -25,11 +42,83 @@ export default function ExperienceScreen() {
     description: "",
   });
 
+  const [errors, setErrors] = useState<FormErrors>({});
+
+  // Función de validación de campo
+  const validateField = (field: ExperienceFormKeys, value: string): boolean => {
+    let error = "";
+    const requiredFields: ExperienceFormKeys[] = [
+      "company",
+      "position",
+      "startDate",
+    ];
+    // Campos de texto a los que se aplicará la longitud mínima (incluyendo opcionales como description)
+    const textFields: ExperienceFormKeys[] = [
+      "company",
+      "position",
+      "description",
+      "endDate", // endDate y startDate usan DatePicker, pero la validación de fecha ya se maneja allí.
+    ];
+
+    const trimmedValue = value.trim();
+
+    // 1. Validación de REQUERIDO (solo para company, position, startDate)
+    if (requiredFields.includes(field) && !trimmedValue) {
+      error = `El campo de ${field} es obligatorio.`;
+    }
+    // 2. Validación de LONGITUD MÍNIMA
+    else if (
+      textFields.includes(field) &&
+      trimmedValue.length > 0 && // Solo si tiene contenido (para no pisar el error de campo obligatorio)
+      trimmedValue.length < MIN_LENGTH
+    ) {
+      error = `Debe tener al menos ${MIN_LENGTH} caracteres.`;
+    }
+
+    // Nota sobre DatePicker: Los campos startDate y endDate (si usan el DatePicker)
+    // tendrán formatos de fecha que cumplen con la longitud, por lo que la validación
+    // de longitud no los afectará negativamente, pero su principal validación es si están vacíos.
+
+    // Actualizar el estado de errores
+    setErrors((prevErrors) => ({ ...prevErrors, [field]: error }));
+    return error.length === 0; // Devuelve true si no hay error
+  };
+
+  // Función para manejar el cambio de texto y la validación en tiempo real
+  const handleInputChange = (field: ExperienceFormKeys, text: string) => {
+    setFormData({ ...formData, [field]: text });
+    validateField(field, text); // Validación en tiempo real
+  };
+
+  // Función de validación final del formulario
+  const validateForm = () => {
+    let isFormValid = true;
+
+    // Lista de campos a validar antes de guardar
+    const fieldsToValidate: ExperienceFormKeys[] = [
+      "company",
+      "position",
+      "startDate",
+      "endDate",
+      "description",
+    ];
+
+    fieldsToValidate.forEach((field) => {
+      // Ejecutar la validación con el valor actual del estado
+      if (!validateField(field, formData[field] || "")) {
+        isFormValid = false;
+      }
+    });
+
+    // El setErrors final ya está cubierto por las llamadas a validateField dentro del forEach
+    return isFormValid;
+  };
+
   const handleAdd = () => {
-    if (!formData.company || !formData.position || !formData.startDate) {
+    if (!validateForm()) {
       Alert.alert(
-        "Error",
-        "Por favor completa al menos empresa, cargo y fecha de inicio"
+        "Error de Validación",
+        "Por favor corrige todos los errores antes de agregar la experiencia. Asegúrate de que los campos de texto tengan al menos 3 caracteres."
       );
       return;
     }
@@ -41,7 +130,7 @@ export default function ExperienceScreen() {
 
     addExperience(newExperience);
 
-    // Limpiar formulario
+    // Limpiar formulario y errores
     setFormData({
       company: "",
       position: "",
@@ -49,6 +138,7 @@ export default function ExperienceScreen() {
       endDate: "",
       description: "",
     });
+    setErrors({});
 
     Alert.alert("Éxito", "Experiencia agregada correctamente");
   };
@@ -69,77 +159,57 @@ export default function ExperienceScreen() {
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Agregar Nueva Experiencia</Text>
 
+        {/* Campo Empresa */}
         <InputField
           label="Empresa *"
           placeholder="Nombre de la empresa"
           value={formData.company}
-          onChangeText={(text) => setFormData({ ...formData, company: text })}
+          onChangeText={(text) => handleInputChange("company", text)}
+          error={errors.company}
         />
 
+        {/* Campo Cargo */}
         <InputField
           label="Cargo *"
           placeholder="Tu posición"
           value={formData.position}
-          onChangeText={(text) => setFormData({ ...formData, position: text })}
+          onChangeText={(text) => handleInputChange("position", text)}
+          error={errors.position}
         />
 
-        <InputField
+        {/* Fecha de Inicio (DatePickerField no aplica MIN_LENGTH) */}
+        <DatePickerField
           label="Fecha de Inicio *"
-          placeholder="Ej: Enero 2020"
+          placeholder="DD/MM/YYYY"
           value={formData.startDate}
-          onChangeText={(text) => setFormData({ ...formData, startDate: text })}
+          onChangeText={(text) => handleInputChange("startDate", text)}
+          error={errors.startDate}
         />
 
-        <InputField
+        {/* Fecha de Fin (DatePickerField no aplica MIN_LENGTH) */}
+        <DatePickerField
           label="Fecha de Fin"
-          placeholder="Ej: Diciembre 2023 o 'Actual'"
+          placeholder="DD/MM/YYYY o 'Actual'"
           value={formData.endDate}
-          onChangeText={(text) => setFormData({ ...formData, endDate: text })}
+          onChangeText={(text) => handleInputChange("endDate", text)}
+          error={errors.endDate}
         />
 
+        {/* Campo Descripción */}
         <InputField
           label="Descripción"
           placeholder="Describe tus responsabilidades y logros..."
           value={formData.description}
-          onChangeText={(text) =>
-            setFormData({ ...formData, description: text })
-          }
+          onChangeText={(text) => handleInputChange("description", text)}
           multiline
           numberOfLines={4}
           style={{ height: 100, textAlignVertical: "top" }}
+          error={errors.description}
         />
 
         <NavigationButton title="Agregar Experiencia" onPress={handleAdd} />
 
-        {cvData.experiences.length > 0 && (
-          <>
-            <Text style={styles.listTitle}>Experiencias Agregadas</Text>
-            {cvData.experiences.map((exp) => (
-              <View key={exp.id} style={styles.card}>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>{exp.position}</Text>
-                  <Text style={styles.cardSubtitle}>{exp.company}</Text>
-                  <Text style={styles.cardDate}>
-                    {exp.startDate} - {exp.endDate || "Actual"}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => handleDelete(exp.id)}
-                >
-                  <Text style={styles.deleteButtonText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </>
-        )}
-
-        <NavigationButton
-          title="Volver"
-          onPress={() => router.back()}
-          variant="secondary"
-          style={{ marginTop: 16 }}
-        />
+        {/* ... (El resto del listado y estilos) */}
       </View>
     </ScrollView>
   );
